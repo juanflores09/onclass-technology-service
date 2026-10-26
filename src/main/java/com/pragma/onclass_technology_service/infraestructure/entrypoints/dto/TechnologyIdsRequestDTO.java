@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotEmpty;
 
 import java.util.List;
 
-public record TechnologyValidationRequestDTO(
+public record TechnologyIdsRequestDTO(
         @NotEmpty(message = "La lista de IDs no puede estar vacía")
         List<Long> ids
 ) {
