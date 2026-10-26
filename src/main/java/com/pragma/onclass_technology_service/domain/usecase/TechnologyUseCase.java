@@ -7,6 +7,8 @@ import com.pragma.onclass_technology_service.domain.spi.TechnologyPersistencePor
 import com.pragma.onclass_technology_service.domain.model.Technology;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 public class TechnologyUseCase implements TechnologyServicePort {
 
     private final TechnologyPersistencePort repositoryPort;
@@ -21,5 +23,10 @@ public class TechnologyUseCase implements TechnologyServicePort {
                 .filter(exists -> !exists)
                 .switchIfEmpty(Mono.error(new BusinessException(TechnicalMessage.TECHNOLOGY_ALREADY_EXISTS)))
                 .flatMap(exists ->repositoryPort.save(technology));
+    }
+
+    @Override
+    public Mono<Boolean> areAllTechnologiesExist(List<Long> ids) {
+        return repositoryPort.areAllTechnologiesExist(ids);
     }
 }

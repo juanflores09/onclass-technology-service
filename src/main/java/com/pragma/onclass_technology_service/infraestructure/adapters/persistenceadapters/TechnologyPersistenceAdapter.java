@@ -7,6 +7,8 @@ import com.pragma.onclass_technology_service.infraestructure.adapters.persistenc
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
+
 @Repository
 public class TechnologyPersistenceAdapter implements TechnologyPersistencePort {
 
@@ -30,5 +32,11 @@ public class TechnologyPersistenceAdapter implements TechnologyPersistencePort {
     @Override
     public Mono<Boolean> existsByName(String name) {
         return repository.existsByName(name);
+    }
+
+    @Override
+    public Mono<Boolean> areAllTechnologiesExist(List<Long> ids) {
+        return repository.countByIdIn(ids)
+                .map(count -> count == ids.size());
     }
 }

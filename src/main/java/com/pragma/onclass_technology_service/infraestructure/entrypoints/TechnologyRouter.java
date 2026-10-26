@@ -6,7 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
-import static org.springframework.web.reactive.function.server.RequestPredicates.POST;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
 @Configuration
@@ -14,6 +13,10 @@ public class TechnologyRouter {
 
     @Bean
     public RouterFunction<ServerResponse> technologyRoutes(TechnologyHandler handler) {
-        return route(POST("/api/v1/technologies"), handler::createTechnology);
+        return route()
+                .POST("/api/v1/technologies", handler::createTechnology)
+                .POST("/api/v1/technologies/validate", handler::validateTechnologies)
+                .build();
+
     }
 }

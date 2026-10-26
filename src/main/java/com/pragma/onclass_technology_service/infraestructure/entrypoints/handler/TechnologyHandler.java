@@ -5,6 +5,7 @@ import com.pragma.onclass_technology_service.domain.emuns.TechnicalMessage;
 import com.pragma.onclass_technology_service.domain.exceptions.BusinessException;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.ApiResponseDTO;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.TechnologyDTO;
+import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.TechnologyValidationRequestDTO;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.util.ErrorDTO;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.mapper.TechnologyMapper;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.util.Constants;
@@ -75,6 +76,49 @@ public class TechnologyHandler {
                             List.of(ErrorDTO.builder()
                                         .code(TechnicalMessage.INTERNAL_ERROR.getCode())
                                         .message(TechnicalMessage.INTERNAL_ERROR.getMessage())
+                                    .build())
+                    );
+                });
+    }
+
+    public Mono<ServerResponse> validateTechnologies(ServerRequest request) {
+
+        String messageId = request.headers().firstHeader(Constants.X_MESSAGE_ID);
+
+        return request.bodyToMono(TechnologyValidationRequestDTO.class)
+                .flatMap(dto -> {
+
+                    Set<ConstraintViolation<TechnologyValidationRequestDTO>> violations = validator.validate(dto);
+                    if (!violations.isEmpty()) {
+                        String errorMessage = violations.iterator().next().getMessage();
+                        return Mono.error(new BusinessException(errorMessage, TechnicalMessage.INVALID_PARAMETERS));
+                    }
+                    return Mono.just(dto);
+                })
+                .flatMap(dto -> technologyServicePort.areAllTechnologiesExist(dto.ids())
+                )
+                .flatMap(exists -> ServerResponse
+                        .status(HttpStatus.OK)
+                        .bodyValue(exists))
+                .contextWrite(Context.of(Constants.X_MESSAGE_ID, Objects.requireNonNull(messageId)))
+                .onErrorResume(BusinessException.class, ex -> buildErrorResponse(
+                        HttpStatus.BAD_REQUEST,
+                        messageId,
+                        ex.getTechnicalMessage(),
+                        List.of(ErrorDTO.builder()
+                                .code(ex.getTechnicalMessage().getCode())
+                                .message(ex.getMessage())
+                                .build())
+                ))
+                .onErrorResume(ex -> {
+                    log.error("Unexpected error occurred for messageId: {}", messageId, ex);
+                    return buildErrorResponse(
+                            HttpStatus.INTERNAL_SERVER_ERROR,
+                            messageId,
+                            TechnicalMessage.INTERNAL_ERROR,
+                            List.of(ErrorDTO.builder()
+                                    .code(TechnicalMessage.INTERNAL_ERROR.getCode())
+                                    .message(TechnicalMessage.INTERNAL_ERROR.getMessage())
                                     .build())
                     );
                 });
