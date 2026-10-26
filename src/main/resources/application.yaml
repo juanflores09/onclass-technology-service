@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: onclass-technology-service
+
+  r2dbc:
+    url: r2dbc:mysql://localhost:3306/db_technology
+    username: root
+    password: 03090409
