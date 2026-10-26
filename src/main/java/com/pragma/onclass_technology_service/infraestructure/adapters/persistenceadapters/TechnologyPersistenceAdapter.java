@@ -4,19 +4,21 @@ import com.pragma.onclass_technology_service.domain.model.Technology;
 import com.pragma.onclass_technology_service.domain.spi.TechnologyPersistencePort;
 import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.entity.TechnologyEntity;
 import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.repository.SpringDataTechnologyRepository;
+import com.pragma.onclass_technology_service.infraestructure.entrypoints.mapper.TechnologyMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
 
+@RequiredArgsConstructor
 @Repository
 public class TechnologyPersistenceAdapter implements TechnologyPersistencePort {
 
     private final SpringDataTechnologyRepository repository;
+    private final TechnologyMapper technologyMapper;
 
-    public TechnologyPersistenceAdapter(SpringDataTechnologyRepository repository) {
-        this.repository = repository;
-    }
 
     @Override
     public Mono<Technology> save(Technology technology) {
@@ -38,5 +40,11 @@ public class TechnologyPersistenceAdapter implements TechnologyPersistencePort {
     public Mono<Boolean> areAllTechnologiesExist(List<Long> ids) {
         return repository.countByIdIn(ids)
                 .map(count -> count == ids.size());
+    }
+
+    @Override
+    public Flux<Technology> findByIdIn(List<Long> ids) {
+        return repository.findByIdIn(ids)
+                .map(technologyMapper::entityToDomain);
     }
 }

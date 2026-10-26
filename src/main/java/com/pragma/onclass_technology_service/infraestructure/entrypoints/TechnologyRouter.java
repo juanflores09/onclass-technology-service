@@ -16,6 +16,7 @@ public class TechnologyRouter {
         return route()
                 .POST("/api/v1/technologies", handler::createTechnology)
                 .POST("/api/v1/technologies/validate", handler::validateTechnologies)
+                .POST("/api/v1/technologies/find", handler::findTechnologiesByIds)
                 .build();
 
     }
