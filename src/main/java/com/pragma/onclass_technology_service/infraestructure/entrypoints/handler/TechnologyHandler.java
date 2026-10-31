@@ -1,6 +1,7 @@
 package com.pragma.onclass_technology_service.infraestructure.entrypoints.handler;
 
 import com.pragma.onclass_technology_service.domain.api.CreateTechnologyServicePort;
+import com.pragma.onclass_technology_service.domain.api.DeleteTechnologiesServicePort;
 import com.pragma.onclass_technology_service.domain.api.FindTechnologiesServicePort;
 import com.pragma.onclass_technology_service.domain.api.SaveCapabilityTechnologyServicePort;
 import com.pragma.onclass_technology_service.domain.emuns.TechnicalMessage;
@@ -34,6 +35,7 @@ public class TechnologyHandler {
     private final CreateTechnologyServicePort createTechnologyServicePort;
     private final FindTechnologiesServicePort findTechnologiesServicePort;
     private final SaveCapabilityTechnologyServicePort saveCapabilityTechnologyServicePort;
+    private final DeleteTechnologiesServicePort deleteTechnologiesServicePort;
     private final TechnologyMapper technologyMapper;
     private final Validator validator;
 
@@ -151,6 +153,42 @@ public class TechnologyHandler {
                     return buildErrorResponse(
                             HttpStatus.INTERNAL_SERVER_ERROR, messageId, TechnicalMessage.INTERNAL_ERROR,
                             List.of(ErrorDTO.builder().code(TechnicalMessage.INTERNAL_ERROR.getCode()).message(TechnicalMessage.INTERNAL_ERROR.getMessage()).build())
+                    );
+                });
+    }
+
+    public Mono<ServerResponse> deleteTechnologiesByCapability(ServerRequest request) {
+        String messageId = request.headers().firstHeader(Constants.X_MESSAGE_ID);
+
+        return Mono.fromCallable(() -> Long.valueOf(request.pathVariable("id")))
+                .onErrorMap(NumberFormatException.class, ex ->
+                        new BusinessException("Invalid capability ID format", TechnicalMessage.INVALID_PARAMETERS)
+                )
+                .flatMap(capabilityId ->
+                        deleteTechnologiesServicePort.deleteTechnologiesByCapability(capabilityId, messageId)
+                                .doOnSuccess(unused -> log.info("Technologies successfully cleaned up for capabilityId: {} with messageId: {}", capabilityId, messageId))
+                                .then(ServerResponse.noContent().build())
+                )
+                .contextWrite(Context.of(Constants.X_MESSAGE_ID, Objects.requireNonNull(messageId)))
+                .onErrorResume(BusinessException.class, ex -> buildErrorResponse(
+                        HttpStatus.BAD_REQUEST,
+                        messageId,
+                        ex.getTechnicalMessage(),
+                        List.of(ErrorDTO.builder()
+                                .code(ex.getTechnicalMessage().getCode())
+                                .message(ex.getMessage())
+                                .build())
+                ))
+                .onErrorResume(ex -> {
+                    log.error("[deleteTechnologiesByCapability] Unexpected error occurred with messageId: {}", messageId, ex);
+                    return buildErrorResponse(
+                            HttpStatus.INTERNAL_SERVER_ERROR,
+                            messageId,
+                            TechnicalMessage.INTERNAL_ERROR,
+                            List.of(ErrorDTO.builder()
+                                    .code(TechnicalMessage.INTERNAL_ERROR.getCode())
+                                    .message(TechnicalMessage.INTERNAL_ERROR.getMessage())
+                                    .build())
                     );
                 });
     }

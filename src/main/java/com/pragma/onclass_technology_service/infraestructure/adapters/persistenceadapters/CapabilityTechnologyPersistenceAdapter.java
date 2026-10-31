@@ -28,4 +28,20 @@ public class CapabilityTechnologyPersistenceAdapter implements CapabilityTechnol
                 .flatMap(capabilityTechnologyRepository::save, 5)
                 .then();
     }
+
+    @Override
+    public Flux<Long> findTechnologyIdsByCapabilityId(Long capabilityId) {
+        return capabilityTechnologyRepository.findByCapabilityId(capabilityId)
+                .map(CapabilityTechnologyEntity::getTechnologyId);
+    }
+
+    @Override
+    public Mono<Void> deleteByCapabilityId(Long capabilityId) {
+        return capabilityTechnologyRepository.deleteByCapabilityId(capabilityId);
+    }
+
+    @Override
+    public Mono<Long> countCapabilitiesByTechnologyId(Long technologyId) {
+        return capabilityTechnologyRepository.countBootcampsByCapabilityId(technologyId);
+    }
 }

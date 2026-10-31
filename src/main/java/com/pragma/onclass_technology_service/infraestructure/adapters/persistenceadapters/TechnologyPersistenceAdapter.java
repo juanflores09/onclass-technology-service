@@ -59,4 +59,9 @@ public class TechnologyPersistenceAdapter implements TechnologyPersistencePort {
                 .map(entry ->
                         new CapabilityTechnologies(entry.getKey(), new ArrayList<>(entry.getValue())));
     }
+
+    @Override
+    public Mono<Void> deleteById(Long technologyId) {
+        return repository.deleteById(technologyId);
+    }
 }

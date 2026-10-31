@@ -17,6 +17,7 @@ public class TechnologyRouter {
                 .POST("/api/v1/technologies", handler::createTechnology)
                 .POST("/api/v1/capabilities-technologies", handler::saveCapabilityTechnologies)
                 .POST("/api/v1/technologies/find-by-capabilities", handler::findTechnologiesByCapabilityId)
+                .DELETE("/api/v1/technologies/capability/{id}", handler::deleteTechnologiesByCapability)
                 .build();
 
     }
