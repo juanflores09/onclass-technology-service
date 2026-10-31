@@ -50,7 +50,7 @@ class TechnologyPersistenceAdapterTest {
     void save_Success() {
         // Given
         when(repository.save(any(TechnologyEntity.class))).thenReturn(Mono.just(technologyEntity));
-
+        when(technologyMapper.entityToDomain(technologyEntity)).thenReturn(technology);
         // When
         Mono<Technology> result = persistenceAdapter.save(technology);
 

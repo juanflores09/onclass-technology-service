@@ -1,6 +1,7 @@
 package com.pragma.onclass_technology_service.infraestructure.entrypoints.handler;
 
 import com.pragma.onclass_technology_service.domain.api.CreateTechnologyServicePort;
+import com.pragma.onclass_technology_service.domain.api.DeleteTechnologiesServicePort;
 import com.pragma.onclass_technology_service.domain.api.FindTechnologiesServicePort;
 import com.pragma.onclass_technology_service.domain.api.SaveCapabilityTechnologyServicePort;
 import com.pragma.onclass_technology_service.domain.emuns.TechnicalMessage;
@@ -46,6 +47,9 @@ class TechnologyHandlerTest {
 
     @Mock
     private FindTechnologiesServicePort findTechnologiesServicePort;
+
+    @Mock
+    private DeleteTechnologiesServicePort deleteTechnologiesServicePort;
 
     @Mock
     private TechnologyMapper technologyMapper;
@@ -272,5 +276,84 @@ class TechnologyHandlerTest {
                 .verifyComplete();
 
         verify(saveCapabilityTechnologyServicePort, times(1)).saveAll(capabilityId, technologyIds);
+    }
+
+    @Test
+    void deleteTechnologiesByCapability_Success() {
+        // Given
+        Long capabilityId = 1L;
+        String messageId = "msg-12345";
+
+        when(serverRequest.pathVariable("id")).thenReturn("1");
+        when(deleteTechnologiesServicePort.deleteTechnologiesByCapability(capabilityId, messageId))
+                .thenReturn(Mono.empty());
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.deleteTechnologiesByCapability(serverRequest);
+
+        // Then
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.NO_CONTENT))
+                .verifyComplete();
+
+        verify(deleteTechnologiesServicePort, times(1)).deleteTechnologiesByCapability(capabilityId, messageId);
+    }
+
+    @Test
+    void deleteTechnologiesByCapability_InvalidIdFormat_ReturnsBadRequest() {
+        // Given
+        when(serverRequest.pathVariable("id")).thenReturn("invalid-id");
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.deleteTechnologiesByCapability(serverRequest);
+
+        // Then
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.BAD_REQUEST))
+                .verifyComplete();
+
+        verifyNoInteractions(deleteTechnologiesServicePort);
+    }
+
+    @Test
+    void deleteTechnologiesByCapability_BusinessException_ReturnsBadRequest() {
+        // Given
+        Long capabilityId = 1L;
+        String messageId = "msg-12345";
+
+        when(serverRequest.pathVariable("id")).thenReturn("1");
+        when(deleteTechnologiesServicePort.deleteTechnologiesByCapability(capabilityId, messageId))
+                .thenReturn(Mono.error(new BusinessException(TechnicalMessage.INVALID_PARAMETERS)));
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.deleteTechnologiesByCapability(serverRequest);
+
+        // Then
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.BAD_REQUEST))
+                .verifyComplete();
+
+        verify(deleteTechnologiesServicePort, times(1)).deleteTechnologiesByCapability(capabilityId, messageId);
+    }
+
+    @Test
+    void deleteTechnologiesByCapability_UnexpectedException_ReturnsInternalServerError() {
+        // Given
+        Long capabilityId = 1L;
+        String messageId = "msg-12345";
+
+        when(serverRequest.pathVariable("id")).thenReturn("1");
+        when(deleteTechnologiesServicePort.deleteTechnologiesByCapability(capabilityId, messageId))
+                .thenReturn(Mono.error(new RuntimeException("Database connectivity failure")));
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.deleteTechnologiesByCapability(serverRequest);
+
+        // Then
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.INTERNAL_SERVER_ERROR))
+                .verifyComplete();
+
+        verify(deleteTechnologiesServicePort, times(1)).deleteTechnologiesByCapability(capabilityId, messageId);
     }
 }
