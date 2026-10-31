@@ -2,11 +2,15 @@ package com.pragma.onclass_technology_service.infraestructure.entrypoints.handle
 
 import com.pragma.onclass_technology_service.domain.api.CreateTechnologyServicePort;
 import com.pragma.onclass_technology_service.domain.api.FindTechnologiesServicePort;
+import com.pragma.onclass_technology_service.domain.api.SaveCapabilityTechnologyServicePort;
 import com.pragma.onclass_technology_service.domain.emuns.TechnicalMessage;
 import com.pragma.onclass_technology_service.domain.exceptions.BusinessException;
+import com.pragma.onclass_technology_service.domain.model.CapabilityTechnologies;
 import com.pragma.onclass_technology_service.domain.model.Technology;
+import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.CapabilityIdsRequestDTO;
+import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.CapabilityTechnologiesRequestDTO;
+import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.CapabilityTechnologiesResponseDTO;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.TechnologyDTO;
-import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.TechnologyIdsRequestDTO;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.mapper.TechnologyMapper;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.util.Constants;
 import jakarta.validation.ConstraintViolation;
@@ -36,6 +40,9 @@ class TechnologyHandlerTest {
 
     @Mock
     private CreateTechnologyServicePort createTechnologyServicePort;
+
+    @Mock
+    private SaveCapabilityTechnologyServicePort saveCapabilityTechnologyServicePort;
 
     @Mock
     private FindTechnologiesServicePort findTechnologiesServicePort;
@@ -99,38 +106,33 @@ class TechnologyHandlerTest {
     }
 
     @Test
-    void validateTechnologies_Success() {
-        TechnologyIdsRequestDTO dto = new TechnologyIdsRequestDTO(List.of(1L, 2L));
+    void findTechnologiesByCapabilityId_Success() {
+        // Given
+        List<Long> ids = List.of(1L);
+        CapabilityIdsRequestDTO requestDTO = new CapabilityIdsRequestDTO(ids);
 
-        when(serverRequest.bodyToMono(TechnologyIdsRequestDTO.class)).thenReturn(Mono.just(dto));
-        when(validator.validate(dto)).thenReturn(Collections.emptySet());
-        when(findTechnologiesServicePort.areAllTechnologiesExist(dto.ids())).thenReturn(Mono.just(true));
+        CapabilityTechnologies capabilityTechnologies = new CapabilityTechnologies(
+                1L, List.of(new Technology(24L, "Java", "Lenguaje de programación"))
+        );
 
-        Mono<ServerResponse> responseMono = technologyHandler.validateTechnologies(serverRequest);
+        when(serverRequest.bodyToMono(CapabilityIdsRequestDTO.class)).thenReturn(Mono.just(requestDTO));
+        when(serverRequest.headers()).thenReturn(headers);
+        when(headers.firstHeader(Constants.X_MESSAGE_ID)).thenReturn("test-message-id");
 
+        when(findTechnologiesServicePort.findTechnologiesByCapabilityId(ids)).thenReturn(Flux.just(capabilityTechnologies));
+
+        CapabilityTechnologiesResponseDTO responseDTO = new CapabilityTechnologiesResponseDTO(1L, List.of());
+        when(technologyMapper.toResponseDTO(List.of(capabilityTechnologies))).thenReturn(List.of(responseDTO));
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.findTechnologiesByCapabilityId(serverRequest);
+
+        // Then
         StepVerifier.create(responseMono)
                 .expectNextMatches(response -> response.statusCode().equals(HttpStatus.OK))
                 .verifyComplete();
 
-        verify(findTechnologiesServicePort, times(1)).areAllTechnologiesExist(dto.ids());
-    }
-
-    @Test
-    void findTechnologiesByIds_Success() {
-        TechnologyIdsRequestDTO dto = new TechnologyIdsRequestDTO(List.of(1L));
-        Technology technology = new Technology(1L, "Spring Boot", "Framework reactivo");
-
-        when(serverRequest.bodyToMono(TechnologyIdsRequestDTO.class)).thenReturn(Mono.just(dto));
-        when(validator.validate(dto)).thenReturn(Collections.emptySet());
-        when(findTechnologiesServicePort.findByIdIn(dto.ids())).thenReturn(Flux.just(technology));
-
-        Mono<ServerResponse> responseMono = technologyHandler.findTechnologiesByIds(serverRequest);
-
-        StepVerifier.create(responseMono)
-                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.OK))
-                .verifyComplete();
-
-        verify(findTechnologiesServicePort, times(1)).findByIdIn(dto.ids());
+        verify(findTechnologiesServicePort, times(1)).findTechnologiesByCapabilityId(ids);
     }
 
     @Test
@@ -170,32 +172,105 @@ class TechnologyHandlerTest {
     }
 
     @Test
-    void validateTechnologies_BusinessException_ReturnsBadRequest() {
-        TechnologyIdsRequestDTO dto = new TechnologyIdsRequestDTO(List.of(1L));
-        when(serverRequest.bodyToMono(TechnologyIdsRequestDTO.class)).thenReturn(Mono.just(dto));
-        when(validator.validate(any(TechnologyIdsRequestDTO.class))).thenReturn(Set.of());
-        when(findTechnologiesServicePort.areAllTechnologiesExist(dto.ids()))
-                .thenReturn(Mono.error(new BusinessException(TechnicalMessage.INVALID_PARAMETERS)));
+    void findTechnologiesByCapabilityId_UnexpectedException_ReturnsInternalServerError() {
+        // Given
+        List<Long> ids = List.of(1L);
+        CapabilityIdsRequestDTO requestDTO = new CapabilityIdsRequestDTO(ids);
 
-        Mono<ServerResponse> responseMono = technologyHandler.validateTechnologies(serverRequest);
+        when(serverRequest.bodyToMono(CapabilityIdsRequestDTO.class)).thenReturn(Mono.just(requestDTO));
+        when(serverRequest.headers()).thenReturn(headers);
+        when(headers.firstHeader(Constants.X_MESSAGE_ID)).thenReturn("test-message-id");
 
+        when(findTechnologiesServicePort.findTechnologiesByCapabilityId(ids))
+                .thenReturn(Flux.error(new RuntimeException("Database timeout")));
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.findTechnologiesByCapabilityId(serverRequest);
+
+        // Then
         StepVerifier.create(responseMono)
-                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.BAD_REQUEST))
+                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.INTERNAL_SERVER_ERROR))
                 .verifyComplete();
     }
 
     @Test
-    void findTechnologiesByIds_UnexpectedException_ReturnsInternalServerError() {
-        TechnologyIdsRequestDTO dto = new TechnologyIdsRequestDTO(List.of(1L));
-        when(serverRequest.bodyToMono(TechnologyIdsRequestDTO.class)).thenReturn(Mono.just(dto));
-        when(validator.validate(any(TechnologyIdsRequestDTO.class))).thenReturn(Set.of());
-        when(findTechnologiesServicePort.findByIdIn(dto.ids()))
-                .thenReturn(Flux.error(new RuntimeException("Database timeout")));
+    void saveCapabilityTechnologies_Success() {
+        // Given
+        Long capabilityId = 1L;
+        List<Long> technologyIds = List.of(10L, 20L);
+        CapabilityTechnologiesRequestDTO requestDTO = new CapabilityTechnologiesRequestDTO(capabilityId, technologyIds);
 
-        Mono<ServerResponse> responseMono = technologyHandler.findTechnologiesByIds(serverRequest);
+        // Mock del request y headers
+        when(serverRequest.bodyToMono(CapabilityTechnologiesRequestDTO.class)).thenReturn(Mono.just(requestDTO));
+        when(serverRequest.headers()).thenReturn(headers);
+        when(headers.firstHeader(Constants.X_MESSAGE_ID)).thenReturn("test-message-id");
 
+        when(validator.validate(requestDTO)).thenReturn(Collections.emptySet());
+
+        when(saveCapabilityTechnologyServicePort.saveAll(capabilityId, technologyIds)).thenReturn(Mono.empty());
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.saveCapabilityTechnologies(serverRequest);
+
+        // Then
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.CREATED))
+                .verifyComplete();
+
+        verify(saveCapabilityTechnologyServicePort, times(1)).saveAll(capabilityId, technologyIds);
+    }
+
+    @Test
+    void saveCapabilityTechnologies_ValidationException_ReturnsBadRequest() {
+        // Given
+        Long capabilityId = 1L;
+        List<Long> technologyIds = Collections.emptyList();
+        CapabilityTechnologiesRequestDTO requestDTO = new CapabilityTechnologiesRequestDTO(capabilityId, technologyIds);
+
+        ConstraintViolation<CapabilityTechnologiesRequestDTO> violation = mock(ConstraintViolation.class);
+        when(violation.getMessage()).thenReturn("The technology list cannot be empty");
+
+        when(serverRequest.bodyToMono(CapabilityTechnologiesRequestDTO.class)).thenReturn(Mono.just(requestDTO));
+        when(serverRequest.headers()).thenReturn(headers);
+        when(headers.firstHeader(Constants.X_MESSAGE_ID)).thenReturn("test-message-id");
+
+        when(validator.validate(requestDTO)).thenReturn(Set.of(violation));
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.saveCapabilityTechnologies(serverRequest);
+
+        // Then
+        StepVerifier.create(responseMono)
+                .expectNextMatches(response -> response.statusCode().equals(HttpStatus.BAD_REQUEST))
+                .verifyComplete();
+
+        verifyNoInteractions(saveCapabilityTechnologyServicePort);
+    }
+
+    @Test
+    void saveCapabilityTechnologies_UnexpectedException_ReturnsInternalServerError() {
+        // Given
+        Long capabilityId = 1L;
+        List<Long> technologyIds = List.of(10L, 20L);
+        CapabilityTechnologiesRequestDTO requestDTO = new CapabilityTechnologiesRequestDTO(capabilityId, technologyIds);
+
+        when(serverRequest.bodyToMono(CapabilityTechnologiesRequestDTO.class)).thenReturn(Mono.just(requestDTO));
+        when(serverRequest.headers()).thenReturn(headers);
+        when(headers.firstHeader(Constants.X_MESSAGE_ID)).thenReturn("test-message-id");
+
+        when(validator.validate(requestDTO)).thenReturn(Collections.emptySet());
+
+        when(saveCapabilityTechnologyServicePort.saveAll(capabilityId, technologyIds))
+                .thenReturn(Mono.error(new RuntimeException("Database error")));
+
+        // When
+        Mono<ServerResponse> responseMono = technologyHandler.saveCapabilityTechnologies(serverRequest);
+
+        // Then
         StepVerifier.create(responseMono)
                 .expectNextMatches(response -> response.statusCode().equals(HttpStatus.INTERNAL_SERVER_ERROR))
                 .verifyComplete();
+
+        verify(saveCapabilityTechnologyServicePort, times(1)).saveAll(capabilityId, technologyIds);
     }
 }

@@ -1,5 +1,6 @@
 package com.pragma.onclass_technology_service.domain.usecase;
 
+import com.pragma.onclass_technology_service.domain.model.CapabilityTechnologies;
 import com.pragma.onclass_technology_service.domain.model.Technology;
 import com.pragma.onclass_technology_service.domain.spi.TechnologyPersistencePort;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,7 +10,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import static org.mockito.Mockito.*;
@@ -24,60 +24,49 @@ class FindTechnologiesUseCaseTest {
     @InjectMocks
     private FindTechnologiesUseCase findTechnologiesUseCase;
 
-    private List<Long> ids;
-    private Technology tech1;
-    private Technology tech2;
-
     @BeforeEach
     void setUp() {
-        ids = List.of(1L, 2L);
-        tech1 = new Technology(1L, "Spring Boot", "Framework reactivo");
-        tech2 = new Technology(2L, "Java", "Lenguaje de programación");
+        repositoryPort = mock(TechnologyPersistencePort.class);
+        findTechnologiesUseCase = new FindTechnologiesUseCase(repositoryPort);
     }
 
     @Test
-    void areAllTechnologiesExist_ReturnsTrue() {
+    void findTechnologiesByCapabilityId_ReturnsCapabilityTechnologiesFlux() {
         // Given
-        when(repositoryPort.areAllTechnologiesExist(ids)).thenReturn(Mono.just(true));
+        List<Long> ids = List.of(1L, 2L);
+        CapabilityTechnologies capabilityTechnologies = new CapabilityTechnologies(
+                1L, List.of(new Technology(24L, "Java", "Lenguaje de programación"))
+        );
 
-        // When & Then
-        Mono<Boolean> result = findTechnologiesUseCase.areAllTechnologiesExist(ids);
+        when(repositoryPort.findTechnologiesByCapabilityIds(ids))
+                .thenReturn(Flux.just(capabilityTechnologies));
 
+        // When
+        Flux<CapabilityTechnologies> result = findTechnologiesUseCase.findTechnologiesByCapabilityId(ids);
+
+        // Then
         StepVerifier.create(result)
-                .expectNext(true)
+                .expectNext(capabilityTechnologies)
                 .verifyComplete();
 
-        verify(repositoryPort, times(1)).areAllTechnologiesExist(ids);
+        verify(repositoryPort, times(1)).findTechnologiesByCapabilityIds(ids);
     }
 
     @Test
-    void areAllTechnologiesExist_ReturnsFalse() {
+    void findTechnologiesByCapabilityId_WhenRepositoryReturnsEmpty_CompletesEmpty() {
         // Given
-        when(repositoryPort.areAllTechnologiesExist(ids)).thenReturn(Mono.just(false));
+        List<Long> ids = List.of(99L);
 
-        // When & Then
-        Mono<Boolean> result = findTechnologiesUseCase.areAllTechnologiesExist(ids);
+        when(repositoryPort.findTechnologiesByCapabilityIds(ids))
+                .thenReturn(Flux.empty());
 
+        // When
+        Flux<CapabilityTechnologies> result = findTechnologiesUseCase.findTechnologiesByCapabilityId(ids);
+
+        // Then
         StepVerifier.create(result)
-                .expectNext(false)
                 .verifyComplete();
 
-        verify(repositoryPort, times(1)).areAllTechnologiesExist(ids);
-    }
-
-    @Test
-    void findByIdIn_ReturnsTechnologiesFlux() {
-        // Given
-        when(repositoryPort.findByIdIn(ids)).thenReturn(Flux.just(tech1, tech2));
-
-        // When & Then
-        Flux<Technology> result = findTechnologiesUseCase.findByIdIn(ids);
-
-        StepVerifier.create(result)
-                .expectNext(tech1)
-                .expectNext(tech2)
-                .verifyComplete();
-
-        verify(repositoryPort, times(1)).findByIdIn(ids);
+        verify(repositoryPort, times(1)).findTechnologiesByCapabilityIds(ids);
     }
 }

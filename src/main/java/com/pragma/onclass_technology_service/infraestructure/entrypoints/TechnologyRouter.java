@@ -15,8 +15,8 @@ public class TechnologyRouter {
     public RouterFunction<ServerResponse> technologyRoutes(TechnologyHandler handler) {
         return route()
                 .POST("/api/v1/technologies", handler::createTechnology)
-                .POST("/api/v1/technologies/validate", handler::validateTechnologies)
-                .POST("/api/v1/technologies/find", handler::findTechnologiesByIds)
+                .POST("/api/v1/capabilities-technologies", handler::saveCapabilityTechnologies)
+                .POST("/api/v1/technologies/find-by-capabilities", handler::findTechnologiesByCapabilityId)
                 .build();
 
     }

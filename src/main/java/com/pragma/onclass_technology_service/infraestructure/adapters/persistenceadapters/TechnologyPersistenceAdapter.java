@@ -1,8 +1,10 @@
 package com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters;
 
+import com.pragma.onclass_technology_service.domain.model.CapabilityTechnologies;
 import com.pragma.onclass_technology_service.domain.model.Technology;
 import com.pragma.onclass_technology_service.domain.spi.TechnologyPersistencePort;
 import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.entity.TechnologyEntity;
+import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.repository.CapabilityTechnologyProjection;
 import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.repository.SpringDataTechnologyRepository;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.mapper.TechnologyMapper;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -27,8 +30,7 @@ public class TechnologyPersistenceAdapter implements TechnologyPersistencePort {
         entity.setDescription(technology.getDescription());
 
         return repository.save(entity)
-                .map(saved -> new Technology(
-                        saved.getId(), saved.getName(), saved.getDescription()));
+                .map(technologyMapper::entityToDomain);
     }
 
     @Override
@@ -43,8 +45,18 @@ public class TechnologyPersistenceAdapter implements TechnologyPersistencePort {
     }
 
     @Override
-    public Flux<Technology> findByIdIn(List<Long> ids) {
-        return repository.findByIdIn(ids)
-                .map(technologyMapper::entityToDomain);
+    public Flux<CapabilityTechnologies> findTechnologiesByCapabilityIds(List<Long> capabilityIds) {
+        return repository.findTechnologiesByCapabilityId(capabilityIds)
+                .collectMultimap(
+                        CapabilityTechnologyProjection::capabilityId,
+                        projection -> new Technology(
+                                projection.id(),
+                                projection.name(),
+                                projection.description()
+                        )
+                )
+                .flatMapMany(map -> Flux.fromIterable(map.entrySet()))
+                .map(entry ->
+                        new CapabilityTechnologies(entry.getKey(), new ArrayList<>(entry.getValue())));
     }
 }

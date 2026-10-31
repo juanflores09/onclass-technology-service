@@ -2,11 +2,10 @@ package com.pragma.onclass_technology_service.infraestructure.entrypoints.handle
 
 import com.pragma.onclass_technology_service.domain.api.CreateTechnologyServicePort;
 import com.pragma.onclass_technology_service.domain.api.FindTechnologiesServicePort;
+import com.pragma.onclass_technology_service.domain.api.SaveCapabilityTechnologyServicePort;
 import com.pragma.onclass_technology_service.domain.emuns.TechnicalMessage;
 import com.pragma.onclass_technology_service.domain.exceptions.BusinessException;
-import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.ApiResponseDTO;
-import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.TechnologyDTO;
-import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.TechnologyIdsRequestDTO;
+import com.pragma.onclass_technology_service.infraestructure.entrypoints.dto.*;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.util.ErrorDTO;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.mapper.TechnologyMapper;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.util.Constants;
@@ -34,6 +33,7 @@ public class TechnologyHandler {
 
     private final CreateTechnologyServicePort createTechnologyServicePort;
     private final FindTechnologiesServicePort findTechnologiesServicePort;
+    private final SaveCapabilityTechnologyServicePort saveCapabilityTechnologyServicePort;
     private final TechnologyMapper technologyMapper;
     private final Validator validator;
 
@@ -83,65 +83,23 @@ public class TechnologyHandler {
                 });
     }
 
-    public Mono<ServerResponse> validateTechnologies(ServerRequest request) {
+    public Mono<ServerResponse> findTechnologiesByCapabilityId(ServerRequest request) {
 
         String messageId = request.headers().firstHeader(Constants.X_MESSAGE_ID);
 
-        return request.bodyToMono(TechnologyIdsRequestDTO.class)
+        return request.bodyToMono(CapabilityIdsRequestDTO.class)
                 .flatMap(dto -> {
-
-                    Set<ConstraintViolation<TechnologyIdsRequestDTO>> violations = validator.validate(dto);
+                    Set<ConstraintViolation<CapabilityIdsRequestDTO>> violations = validator.validate(dto);
                     if (!violations.isEmpty()) {
                         String errorMessage = violations.iterator().next().getMessage();
                         return Mono.error(new BusinessException(errorMessage, TechnicalMessage.INVALID_PARAMETERS));
                     }
-                    return Mono.just(dto);
+                    return Mono.just(dto.ids());
                 })
-                .flatMap(dto -> findTechnologiesServicePort.areAllTechnologiesExist(dto.ids())
-                )
-                .flatMap(exists -> ServerResponse
-                        .status(HttpStatus.OK)
-                        .bodyValue(exists))
-                .contextWrite(Context.of(Constants.X_MESSAGE_ID, Objects.requireNonNull(messageId)))
-                .onErrorResume(BusinessException.class, ex -> buildErrorResponse(
-                        HttpStatus.BAD_REQUEST,
-                        messageId,
-                        ex.getTechnicalMessage(),
-                        List.of(ErrorDTO.builder()
-                                .code(ex.getTechnicalMessage().getCode())
-                                .message(ex.getMessage())
-                                .build())
-                ))
-                .onErrorResume(ex -> {
-                    log.error("Unexpected error occurred for messageId: {}", messageId, ex);
-                    return buildErrorResponse(
-                            HttpStatus.INTERNAL_SERVER_ERROR,
-                            messageId,
-                            TechnicalMessage.INTERNAL_ERROR,
-                            List.of(ErrorDTO.builder()
-                                    .code(TechnicalMessage.INTERNAL_ERROR.getCode())
-                                    .message(TechnicalMessage.INTERNAL_ERROR.getMessage())
-                                    .build())
-                    );
-                });
-    }
-    public Mono<ServerResponse> findTechnologiesByIds(ServerRequest request) {
-
-        String messageId = request.headers().firstHeader(Constants.X_MESSAGE_ID);
-
-        return request.bodyToMono(TechnologyIdsRequestDTO.class)
-                .flatMap(dto -> {
-
-                    Set<ConstraintViolation<TechnologyIdsRequestDTO>> violations = validator.validate(dto);
-                    if (!violations.isEmpty()) {
-                        String errorMessage = violations.iterator().next().getMessage();
-                        return Mono.error(new BusinessException(errorMessage, TechnicalMessage.INVALID_PARAMETERS));
-                    }
-                    return Mono.just(dto);
-                })
-                .flatMap(dto -> findTechnologiesServicePort.findByIdIn(dto.ids())
+                .flatMap(ids -> findTechnologiesServicePort.findTechnologiesByCapabilityId(ids)
                         .collectList()
                 )
+                .map(technologyMapper::toResponseDTO)
                 .flatMap(technologies -> ServerResponse
                         .status(HttpStatus.OK)
                         .bodyValue(technologies))
@@ -165,6 +123,34 @@ public class TechnologyHandler {
                                     .code(TechnicalMessage.INTERNAL_ERROR.getCode())
                                     .message(TechnicalMessage.INTERNAL_ERROR.getMessage())
                                     .build())
+                    );
+                });
+    }
+
+    public Mono<ServerResponse> saveCapabilityTechnologies(ServerRequest request) {
+        String messageId = request.headers().firstHeader(Constants.X_MESSAGE_ID);
+
+        return request.bodyToMono(CapabilityTechnologiesRequestDTO.class)
+                .flatMap(dto -> {
+                    Set<ConstraintViolation<CapabilityTechnologiesRequestDTO>> violations = validator.validate(dto);
+                    if (!violations.isEmpty()) {
+                        String errorMessage = violations.iterator().next().getMessage();
+                        return Mono.error(new BusinessException(errorMessage, TechnicalMessage.INVALID_PARAMETERS));
+                    }
+                    return Mono.just(dto);
+                })
+                .flatMap(dto -> saveCapabilityTechnologyServicePort.saveAll(dto.capabilityId(), dto.technologyIds()))
+                .then(ServerResponse.status(HttpStatus.CREATED).build())
+                .contextWrite(Context.of(Constants.X_MESSAGE_ID, Objects.requireNonNullElse(messageId, "")))
+                .onErrorResume(BusinessException.class, ex -> buildErrorResponse(
+                        HttpStatus.BAD_REQUEST, messageId, ex.getTechnicalMessage(),
+                        List.of(ErrorDTO.builder().code(ex.getTechnicalMessage().getCode()).message(ex.getMessage()).build())
+                ))
+                .onErrorResume(ex -> {
+                    log.error("[saveCapabilityTechnologies] Unexpected error for messageId: {}", messageId, ex);
+                    return buildErrorResponse(
+                            HttpStatus.INTERNAL_SERVER_ERROR, messageId, TechnicalMessage.INTERNAL_ERROR,
+                            List.of(ErrorDTO.builder().code(TechnicalMessage.INTERNAL_ERROR.getCode()).message(TechnicalMessage.INTERNAL_ERROR.getMessage()).build())
                     );
                 });
     }

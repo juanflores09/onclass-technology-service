@@ -1,8 +1,10 @@
 package com.pragma.onclass_technology_service.infraestructure.adapters;
 
+import com.pragma.onclass_technology_service.domain.model.CapabilityTechnologies;
 import com.pragma.onclass_technology_service.domain.model.Technology;
 import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.TechnologyPersistenceAdapter;
 import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.entity.TechnologyEntity;
+import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.repository.CapabilityTechnologyProjection;
 import com.pragma.onclass_technology_service.infraestructure.adapters.persistenceadapters.repository.SpringDataTechnologyRepository;
 import com.pragma.onclass_technology_service.infraestructure.entrypoints.mapper.TechnologyMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,21 +115,28 @@ class TechnologyPersistenceAdapterTest {
     }
 
     @Test
-    void findByIdIn_ReturnsMappedTechnologies() {
+    void findTechnologiesByCapabilityIds_ReturnsMappedCapabilityTechnologies() {
         // Given
         List<Long> ids = List.of(1L);
-        when(repository.findByIdIn(ids)).thenReturn(Flux.just(technologyEntity));
-        when(technologyMapper.entityToDomain(technologyEntity)).thenReturn(technology);
+
+        CapabilityTechnologyProjection projection = new CapabilityTechnologyProjection(
+                1L, 24L, "Java", "Lenguaje de programación"
+        );
+
+        when(repository.findTechnologiesByCapabilityId(ids)).thenReturn(Flux.just(projection));
 
         // When
-        Flux<Technology> result = persistenceAdapter.findByIdIn(ids);
+        Flux<CapabilityTechnologies> result = persistenceAdapter.findTechnologiesByCapabilityIds(ids);
 
         // Then
+        CapabilityTechnologies expectedResult = new CapabilityTechnologies(
+                1L, List.of(new Technology(24L, "Java", "Lenguaje de programación"))
+        );
+
         StepVerifier.create(result)
-                .expectNext(technology)
+                .expectNext(expectedResult)
                 .verifyComplete();
 
-        verify(repository, times(1)).findByIdIn(ids);
-        verify(technologyMapper, times(1)).entityToDomain(technologyEntity);
+        verify(repository, times(1)).findTechnologiesByCapabilityId(ids);
     }
 }
