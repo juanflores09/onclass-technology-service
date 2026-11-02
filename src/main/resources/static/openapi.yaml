@@ -1,26 +1,25 @@
 openapi: 3.0.3
 info:
-  title: API de Tecnologías
+  title: Technology Microservice API
+  description: Microservicio encargado de la gestión de tecnologías, capacidades y sus relaciones.
   version: 1.0.0
-  description: Documentación de la API para la gestión de tecnologías.
 
 servers:
   - url: http://localhost:8081
-    description: Servidor Local de Desarrollo
+    description: Servidor Local
 
 paths:
   /api/v1/technologies:
     post:
       summary: Crear una nueva tecnología
-      description: Recibe los datos de una tecnología, valida restricciones y la registra en el sistema.
-      operationId: createTechnology
+      description: Registra una tecnología en el sistema tras validar sus parámetros.
       parameters:
-        - in: header
-          name: x-message-id
-          required: true
+        - name: x-message-id
+          in: header
+          required: false
+          description: Identificador único de traza del mensaje
           schema:
             type: string
-          description: Identificador único del mensaje para trazabilidad
       requestBody:
         required: true
         content:
@@ -33,7 +32,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Technology'
+                $ref: '#/components/schemas/TechnologyResponseDTO'
         '400':
           description: Parámetros inválidos o error de negocio
           content:
@@ -47,33 +46,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseDTO'
 
-  /api/v1/technologies/validate:
+  /api/v1/capabilities-technologies:
     post:
-      summary: Validar existencia de múltiples tecnologías
-      description: Comprueba si un conjunto de IDs de tecnologías existen en la base de datos.
-      operationId: validateTechnologies
+      summary: Asociar tecnologías a una capacidad
+      description: Guarda la relación entre una capacidad y una lista de tecnologías.
       parameters:
-        - in: header
-          name: x-message-id
-          required: true
+        - name: x-message-id
+          in: header
+          required: false
+          description: Identificador único de traza del mensaje
           schema:
             type: string
-          description: Identificador único del mensaje para trazabilidad
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TechnologyIdsRequestDTO'
+              $ref: '#/components/schemas/CapabilityTechnologiesRequestDTO'
       responses:
-        '200':
-          description: Validación completada (retorna true o false)
-          content:
-            application/json:
-              schema:
-                type: boolean
+        '201':
+          description: Relación de tecnologías y capacidad guardada exitosamente
         '400':
-          description: Parámetros inválidos o error de negocio
+          description: Parámetros inválidos o error de validación
           content:
             application/json:
               schema:
@@ -85,35 +79,68 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseDTO'
 
-  /api/v1/technologies/find:
+  /api/v1/technologies/find-by-capabilities:
     post:
-      summary: Buscar tecnologías por una lista de IDs
-      description: Retorna la lista completa de objetos tecnológicos correspondientes a los IDs proporcionados.
-      operationId: findTechnologiesByIds
+      summary: Buscar tecnologías por IDs de capacidades
+      description: Retorna una lista de tecnologías asociadas a los IDs de capacidades provistos en un bloque de peticiones.
       parameters:
-        - in: header
-          name: x-message-id
-          required: true
+        - name: x-message-id
+          in: header
+          required: false
+          description: Identificador único de traza del mensaje
           schema:
             type: string
-          description: Identificador único del mensaje para trazabilidad
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TechnologyIdsRequestDTO'
+              $ref: '#/components/schemas/CapabilityIdsRequestDTO'
       responses:
         '200':
-          description: Tecnologías encontradas exitosamente
+          description: Lista de tecnologías encontradas
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Technology'
+                  $ref: '#/components/schemas/TechnologyResponseDTO'
         '400':
-          description: Parámetros inválidos o error de negocio
+          description: Parámetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDTO'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDTO'
+
+  /api/v1/technologies/capability/{id}:
+    delete:
+      summary: Eliminar tecnologías por ID de capacidad
+      description: Elimina las asociaciones de tecnologías vinculadas a una capacidad específica.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la capacidad cuyas tecnologías se eliminarán
+          schema:
+            type: integer
+            format: int64
+        - name: x-message-id
+          in: header
+          required: false
+          description: Identificador único de traza del mensaje
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Tecnologías limpiadas/eliminadas exitosamente (No Content)
+        '400':
+          description: Formato de ID inválido o error de negocio
           content:
             application/json:
               schema:
@@ -135,12 +162,43 @@ components:
       properties:
         name:
           type: string
-          example: Spring Boot
+          example: "Spring WebFlux"
         description:
           type: string
-          example: Framework reactivo para Java
+          example: "Framework reactivo para Java"
 
-    TechnologyIdsRequestDTO:
+    TechnologyResponseDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "Spring WebFlux"
+        description:
+          type: string
+          example: "Framework reactivo para Java"
+
+    CapabilityTechnologiesRequestDTO:
+      type: object
+      required:
+        - capabilityId
+        - technologyIds
+      properties:
+        capabilityId:
+          type: integer
+          format: int64
+          example: 10
+        technologyIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+          example: [1, 2, 3]
+
+    CapabilityIdsRequestDTO:
       type: object
       required:
         - ids
@@ -150,49 +208,34 @@ components:
           items:
             type: integer
             format: int64
-          example: [1, 2, 3]
-
-    Technology:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-          example: 1
-        name:
-          type: string
-          example: Spring Boot
-        description:
-          type: string
-          example: Framework reactivo para Java
-
-    ErrorDTO:
-      type: object
-      properties:
-        code:
-          type: string
-          example: "ERR_01"
-        message:
-          type: string
-          example: "El campo no puede estar vacío"
+          example: [10, 11, 12]
 
     ApiResponseDTO:
       type: object
       properties:
         code:
           type: string
-          example: "400"
+          example: "INVALID_PARAMETERS"
         message:
           type: string
-          example: "Bad Request"
+          example: "The provided parameters are invalid."
         identifier:
           type: string
-          example: "msg-123456"
+          example: "msg-uuid-1234"
         date:
           type: string
-          format: date-time
-          example: "2026-10-28T15:30:00Z"
+          example: "2026-11-02T16:30:00Z"
         errors:
           type: array
           items:
             $ref: '#/components/schemas/ErrorDTO'
+
+    ErrorDTO:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "INVALID_PARAMETERS"
+        message:
+          type: string
+          example: "El campo name no puede estar vacío"
